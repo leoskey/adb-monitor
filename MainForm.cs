@@ -85,7 +85,17 @@ public sealed class MainForm : Form
         get { var cp = base.CreateParams; cp.ExStyle |= 0x80 /*WS_EX_TOOLWINDOW*/ | 0x8 /*WS_EX_TOPMOST*/; return cp; }
     }
     protected override bool ShowWithoutActivation => true;
-    protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Theme.StyleWindow(Handle); }
+    // 句柄创建后才知道窗口所在屏幕的 DPI（构造时按主屏算），所以这里再排一次
+    protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Theme.StyleWindow(Handle); Relayout(); }
+
+    /// <summary>拖到缩放比例不同的屏幕上：按新 DPI 重排，抓取点跟着缩放，光标才不会跑到窗口外面。</summary>
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
+        _grab = new Point(_grab.X * e.DeviceDpiNew / e.DeviceDpiOld, _grab.Y * e.DeviceDpiNew / e.DeviceDpiOld);
+        Relayout();
+        Invalidate(true);
+    }
 
     protected override async void OnShown(EventArgs e)
     {
@@ -283,9 +293,7 @@ public sealed class MainForm : Form
         if (e.HasFlag(Edge.Right)) b.X = wa.Right - b.Width;
         if (e.HasFlag(Edge.Top)) b.Y = wa.Top;
         if (e.HasFlag(Edge.Bottom)) b.Y = wa.Bottom - b.Height;
-        // 改大小后整窗重绘：窗口被系统 DPI 缩放时（副屏缩放比例和主屏不同），默认只重绘新露出的区域，
-        // 旧边缘处会留下一列没画到、透出桌面的像素
-        if (Bounds != b) { Bounds = b; Invalidate(true); }
+        if (Bounds != b) Bounds = b;
     }
 
     void PlaceOnStart()
@@ -343,10 +351,9 @@ public sealed class MainForm : Form
         {
             // 位置按光标算，不用 lParam 里的：系统是在上一次（已被贴边改写的）矩形上累加鼠标位移，
             // 慢速拖动时每次位移都小于贴靠距离，贴边后就再也拖不出去
-            var r = Marshal.PtrToStructure<RECT>(m.LParam);
             var cur = Cursor.Position;
             var wa = Area(Screen.FromPoint(cur));
-            var snapped = Snap(new Rectangle(cur.X - _grab.X, cur.Y - _grab.Y, r.R - r.L, r.B - r.T), wa, LogicalToDeviceUnits(SnapDist));
+            var snapped = Snap(new Rectangle(cur.X - _grab.X, cur.Y - _grab.Y, Width, Height), wa, LogicalToDeviceUnits(SnapDist));
             Marshal.StructureToPtr(new RECT { L = snapped.Left, T = snapped.Top, R = snapped.Right, B = snapped.Bottom }, m.LParam, false);
             m.Result = 1;
             return;
@@ -417,7 +424,7 @@ public sealed class MainForm : Form
         static readonly Font CheckFont = new(Theme.Icons, 9f);
 
         protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e) =>
-            TextRenderer.DrawText(e.Graphics, "" /*CheckMark*/, CheckFont, e.ImageRectangle, Theme.Ok,
+            TextRenderer.DrawText(e.Graphics, "" /*CheckMark*/, CheckFont.At(e.ToolStrip?.DeviceDpi ?? 96), e.ImageRectangle, Theme.Ok,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
     }
 

@@ -21,6 +21,17 @@ static class Theme
     public const string GlyphUsb = "", GlyphWifi = "", GlyphPhone = "",
         GlyphCheck = "", GlyphEdit = "", GlyphCopy = "";
 
+    [DllImport("user32.dll")] static extern int GetDpiForSystem();
+    static readonly int SystemDpi = GetDpiForSystem();
+    static readonly Dictionary<(Font, int), Font> Scaled = [];
+
+    /// <summary>
+    /// 给指定 DPI 的窗口用的字体。GDI 按系统 DPI（启动时主屏的缩放）把磅值换算成像素，
+    /// 窗口在缩放比例不同的屏幕上时不会跟着变，要自己换算字号。
+    /// </summary>
+    public static Font At(this Font f, int dpi) =>
+        dpi == SystemDpi ? f : Scaled.TryGetValue((f, dpi), out var s) ? s : Scaled[(f, dpi)] = new Font(f.FontFamily, f.Size * dpi / SystemDpi, f.Style);
+
     static Color Hex(int rgb) => Color.FromArgb(255, Color.FromArgb(rgb));
 
     public static Color ToneColor(Tone t) => t switch
@@ -76,8 +87,9 @@ static class Theme
 sealed class DeviceIcon : Control
 {
     public const int CellW = 56, CellH = 68;
-    static readonly Font Num = new(Theme.UiSemibold, 9.75f), NameFont = new(Theme.Ui, 8f),
-        Glyph = new(Theme.Icons, 7f), BigGlyph = new(Theme.Icons, 11f);
+    static readonly Font NumF = new(Theme.UiSemibold, 9.75f), NameF = new(Theme.Ui, 8f),
+        GlyphF = new(Theme.Icons, 7f), BigGlyphF = new(Theme.Icons, 11f);
+    Font Num => NumF.At(DeviceDpi); Font NameFont => NameF.At(DeviceDpi); Font Glyph => GlyphF.At(DeviceDpi); Font BigGlyph => BigGlyphF.At(DeviceDpi);
     const TextFormatFlags Center = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine;
 
     public Device? Device;
@@ -160,8 +172,10 @@ sealed record CardContent(string Title, string Big, string Sub, Tone Tone, int? 
 /// </summary>
 sealed class DetailCard : Form
 {
-    static readonly Font TitleFont = new(Theme.UiSemibold, 11f), BigFont = new(Theme.Display, 24f), MidFont = new(Theme.Display, 16f),
-        TextFont = new(Theme.Ui, 9.75f), IconFont = new(Theme.Icons, 10.5f);
+    static readonly Font TitleF = new(Theme.UiSemibold, 11f), BigF = new(Theme.Display, 24f), MidF = new(Theme.Display, 16f),
+        TextF = new(Theme.Ui, 9.75f), IconF = new(Theme.Icons, 10.5f);
+    Font TitleFont => TitleF.At(Dpi); Font BigFont => BigF.At(Dpi); Font MidFont => MidF.At(Dpi);
+    Font TextFont => TextF.At(Dpi); Font IconFont => IconF.At(Dpi);
     const TextFormatFlags Flags = TextFormatFlags.NoPadding | TextFormatFlags.Left | TextFormatFlags.Top;
     const TextFormatFlags Line = TextFormatFlags.NoPadding | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis;
 
@@ -170,6 +184,7 @@ sealed class DetailCard : Form
     readonly System.Windows.Forms.Timer _copied = new() { Interval = 1200 };
     Rectangle _editBtn, _copyBtn, _removeBtn, _hot;
     bool _renaming;
+    int _dpi;
 
     /// <summary>改名确认时触发，参数是去掉首尾空白的新名称（空字符串表示恢复默认）。</summary>
     public event Action<string>? Renamed;
@@ -203,13 +218,18 @@ sealed class DetailCard : Form
     protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Theme.StyleWindow(Handle); }
     protected override void OnVisibleChanged(EventArgs e) { if (!Visible) EndRename(); base.OnVisibleChanged(e); }
 
-    int Px(int v) => LogicalToDeviceUnits(v);
+    // 卡片始终贴着小窗显示，尺寸和字号跟小窗所在屏幕的 DPI 走，由 SetContent 在定位之前重排；
+    // 不用卡片自己的 DPI：它要等挪到那块屏幕上才变，而且隐藏时不可靠
+    int Dpi => Owner?.DeviceDpi ?? DeviceDpi;
+    int Px(int v) => (Owner ?? (Control)this).LogicalToDeviceUnits(v);
+    protected override void OnDpiChanged(DpiChangedEventArgs e) { } // 不让 WinForms 按卡片自己的 DPI 再缩放一次
 
     public void SetContent(CardContent c)
     {
-        if (_c is { } o && c with { Rows = o.Rows } == o && c.Rows.SequenceEqual(o.Rows)) return;
-        if (_c?.Serial != c.Serial) EndRename();
+        if (_c is { } o && c with { Rows = o.Rows } == o && c.Rows.SequenceEqual(o.Rows) && _dpi == Dpi) return;
+        if (_c?.Serial != c.Serial || _dpi != Dpi) EndRename();
         _c = c;
+        _dpi = Dpi;
         ClientSize = Arrange(null);
         Invalidate();
     }
