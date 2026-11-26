@@ -1,3 +1,5 @@
+<img src="docs/logo.svg" width="72" alt="ADB Monitor logo">
+
 # ADB Monitor
 
 常驻桌面的小窗，一眼看清通过 ADB 连到本机的 Android 设备：有线（USB 调试）/ 无线（无线调试）连接状态和电量。
@@ -94,6 +96,8 @@ dotnet run -- --demo
 用假数据（充电、正常且带别名、低电量、未授权、已断开各一台）运行界面并展开一张卡片，不读写状态文件、没有托盘图标，可以和正式实例同时运行。
 
 `docs/screenshot.png` 由 `--selftest` 渲染出的小窗（`out.png`）和第一张卡片（`out.card0.png`）拼成，界面变化后需要重新生成。
+
+`app.ico`（exe 图标，16 ~ 256px 共 8 个尺寸）与 `docs/logo.svg` 是同一个图形，改 logo 时两个文件都要换。托盘图标不用它，仍在运行时按系统小图标尺寸画出不带底板的圆环，16px 下更清楚。
 
 ### 实现说明
 
