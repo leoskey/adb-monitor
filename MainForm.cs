@@ -17,7 +17,7 @@ public sealed class MainForm : Form
     readonly System.Windows.Forms.Timer _clickWatch = new() { Interval = 50 };
     Device? _target, _cardDevice;
     string? _error;
-    Point _downPos;
+    Point _downPos, _grab; // 按下时的光标位置，以及它相对窗口左上角的偏移
     bool _pressed, _buttonWasDown;
 
     public MainForm(bool demo)
@@ -283,7 +283,9 @@ public sealed class MainForm : Form
         if (e.HasFlag(Edge.Right)) b.X = wa.Right - b.Width;
         if (e.HasFlag(Edge.Top)) b.Y = wa.Top;
         if (e.HasFlag(Edge.Bottom)) b.Y = wa.Bottom - b.Height;
-        if (Bounds != b) Bounds = b;
+        // 改大小后整窗重绘：窗口被系统 DPI 缩放时（副屏缩放比例和主屏不同），默认只重绘新露出的区域，
+        // 旧边缘处会留下一列没画到、透出桌面的像素
+        if (Bounds != b) { Bounds = b; Invalidate(true); }
     }
 
     void PlaceOnStart()
@@ -315,7 +317,7 @@ public sealed class MainForm : Form
     /// <summary>左键按下后移动超过系统拖动阈值才进入拖动；没移动就松开算单击。</summary>
     void HookMouse(Control c)
     {
-        c.MouseDown += (_, e) => { if (e.Button == MouseButtons.Left) { _pressed = true; _downPos = Cursor.Position; } };
+        c.MouseDown += (_, e) => { if (e.Button == MouseButtons.Left) { _pressed = true; _downPos = Cursor.Position; _grab = _downPos - (Size)Location; } };
         c.MouseMove += (_, e) =>
         {
             if (!_pressed || e.Button != MouseButtons.Left) return;
@@ -339,9 +341,12 @@ public sealed class MainForm : Form
         const int WM_MOVING = 0x0216, WM_EXITSIZEMOVE = 0x0232;
         if (m.Msg == WM_MOVING)
         {
+            // 位置按光标算，不用 lParam 里的：系统是在上一次（已被贴边改写的）矩形上累加鼠标位移，
+            // 慢速拖动时每次位移都小于贴靠距离，贴边后就再也拖不出去
             var r = Marshal.PtrToStructure<RECT>(m.LParam);
-            var wa = Area(Screen.FromPoint(Cursor.Position));
-            var snapped = Snap(Rectangle.FromLTRB(r.L, r.T, r.R, r.B), wa, LogicalToDeviceUnits(SnapDist));
+            var cur = Cursor.Position;
+            var wa = Area(Screen.FromPoint(cur));
+            var snapped = Snap(new Rectangle(cur.X - _grab.X, cur.Y - _grab.Y, r.R - r.L, r.B - r.T), wa, LogicalToDeviceUnits(SnapDist));
             Marshal.StructureToPtr(new RECT { L = snapped.Left, T = snapped.Top, R = snapped.Right, B = snapped.Bottom }, m.LParam, false);
             m.Result = 1;
             return;
