@@ -12,7 +12,7 @@
 - [.NET 10 桌面运行时](https://dotnet.microsoft.com/download/dotnet/10.0)
 - `adb.exe`：在 `PATH` 中，或位于 `%LOCALAPPDATA%\Android\Sdk\platform-tools`（Android Studio 的默认安装位置）
 
-从 [Releases](https://github.com/leoskey/adb-monitor/releases/latest) 下载 `AdbMonitor.exe`，直接运行。小窗出现在屏幕右侧，不占任务栏；右键小窗可以设置开机自启或退出。
+从 [Releases](https://github.com/leoskey/adb-monitor/releases/latest) 下载 `AdbMonitor.exe`，直接运行。小窗出现在屏幕右侧，不占任务栏，另有一个托盘图标；右键小窗或托盘图标可以设置开机自启或退出。
 
 > [!WARNING]
 > 程序会自动连接局域网里开着无线调试的设备。在公司、学校这类共享网络里，同网段其他人开着 5555 端口调试的设备也会被连接，对方设备上可能弹出「允许 USB 调试」。
@@ -40,6 +40,7 @@
 - **复制序列号**：点序列号右侧的按钮。
 - **移除设备**：已断开的设备在卡片底部有「移除设备」。在线设备不能移除。
 - **右键图标**：重命名、移除、开机自启、退出。
+- **托盘图标**：左键隐藏 / 显示小窗（隐藏期间照常轮询）；右键是开机自启和退出。
 - **拖动**：按住小窗移动；靠近屏幕边缘会自动贴边。贴左右边时竖排，贴上下边时横排。
 
 ### 无线设备
@@ -78,7 +79,7 @@ dotnet publish -c Release -o publish
 dotnet run -- --selftest
 ```
 
-运行解析、卡片内容与贴边逻辑的自检，退出码 0 表示通过。附加 png 路径（`--selftest out.png`）会额外把演示数据渲染成图片，并对卡片执行改名、移除的点击测试：`out.png` 是小窗，`out.card0.png` ~ `out.card4.png` 是五台演示设备的卡片，`out.rename.png` 是改名状态。
+运行解析、卡片内容与贴边逻辑的自检，退出码 0 表示通过。附加 png 路径（`--selftest out.png`）会额外把演示数据渲染成图片，并对卡片执行改名、移除的点击测试，以及小窗的隐藏 / 显示：`out.png` 是小窗，`out.card0.png` ~ `out.card4.png` 是五台演示设备的卡片，`out.rename.png` 是改名状态。
 
 ```bash
 dotnet run -- --scan
@@ -90,7 +91,7 @@ dotnet run -- --scan
 dotnet run -- --demo
 ```
 
-用假数据（充电、正常且带别名、低电量、未授权、已断开各一台）运行界面并展开一张卡片，不读写状态文件，可以和正式实例同时运行。
+用假数据（充电、正常且带别名、低电量、未授权、已断开各一台）运行界面并展开一张卡片，不读写状态文件、没有托盘图标，可以和正式实例同时运行。
 
 `docs/screenshot.png` 由 `--selftest` 渲染出的小窗（`out.png`）和第一张卡片（`out.card0.png`）拼成，界面变化后需要重新生成。
 

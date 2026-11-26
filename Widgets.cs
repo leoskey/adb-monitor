@@ -39,6 +39,23 @@ static class Theme
         DwmSetWindowAttribute(hwnd, 34 /*DWMWA_BORDER_COLOR*/, ref border, 4);
     }
 
+    /// <summary>托盘图标：和设备图标同款的电量圆环，运行时画出来，不带 .ico 资源。</summary>
+    public static Icon RingIcon(int size)
+    {
+        using var bmp = new Bitmap(size, size);
+        using (var g = Graphics.FromImage(bmp))
+        {
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            float w = size / 5.5f;
+            var arc = new RectangleF(w / 2 + .5f, w / 2 + .5f, size - w - 1, size - w - 1);
+            using var track = new Pen(Off, w);
+            using var pen = new Pen(Ok, w) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            g.DrawEllipse(track, arc);
+            g.DrawArc(pen, arc, -90, 270);
+        }
+        return Icon.FromHandle(bmp.GetHicon()); // ponytail: HICON 不释放，整个进程只创建一次
+    }
+
     public static GraphicsPath RoundRect(RectangleF r, float radius)
     {
         var p = new GraphicsPath();

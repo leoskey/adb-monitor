@@ -13,6 +13,7 @@ public sealed class MainForm : Form
     readonly ContextMenuStrip _menu = new();
     readonly ToolStripMenuItem _rename, _remove, _autostart;
     readonly DetailCard _card = new();
+    readonly NotifyIcon _tray = new() { Text = "ADB Monitor" };
     readonly System.Windows.Forms.Timer _clickWatch = new() { Interval = 50 };
     Device? _target, _cardDevice;
     string? _error;
@@ -53,6 +54,14 @@ public sealed class MainForm : Form
         };
         ContextMenuStrip = _menu;
         HookMouse(this);
+
+        if (!demo) // 演示实例不占托盘
+        {
+            _tray.Icon = Theme.RingIcon(SystemInformation.SmallIconSize.Width);
+            _tray.ContextMenuStrip = _menu;
+            _tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) ToggleVisible(); };
+            _tray.Visible = true;
+        }
 
         _card.Owner = this;
         _card.Renamed += name =>
@@ -107,6 +116,12 @@ public sealed class MainForm : Form
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e) { SaveState(); base.OnFormClosing(e); }
+
+    // 不释放的话退出后托盘里会留一个残影，鼠标划过才消失
+    protected override void Dispose(bool disposing) { if (disposing) _tray.Dispose(); base.Dispose(disposing); }
+
+    /// <summary>托盘图标左键：隐藏 / 显示小窗；隐藏期间照常轮询。</summary>
+    internal void ToggleVisible() { _card.Hide(); Visible = !Visible; }
 
     internal static List<Live> Demo() =>
     [

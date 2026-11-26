@@ -122,6 +122,11 @@ static class Program
                 f.ShowCardFor(0); // 在线设备的卡片没有移除按钮，同一位置点下去不应移除
                 Click(card, card.Width / 2, card.Height - Px(16 + 18));
                 Check(card.Visible && f.Controls.Count == 4, "online device cannot be removed");
+
+                f.ToggleVisible();
+                Check(!f.Visible && !card.Visible, "tray click hides window and card");
+                f.ToggleVisible();
+                Check(f.Visible && !card.Visible, "tray click shows window again");
             }
             Console.WriteLine("selftest OK");
             return 0;
